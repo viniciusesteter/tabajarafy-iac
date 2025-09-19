@@ -226,6 +226,7 @@ jobs:
 
       - name: Restore Terraform config
         id: restore_terraform_config
+        if: contains(needs.validation.outputs.removed_files, 'terraform/')
         run: |
           mkdir -p terraform
           echo '${{ secrets.TF_CONFIG }}' > terraform/main.tf 
