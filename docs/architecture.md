@@ -17,37 +17,10 @@ This project provisions a complete, production-ready AWS infrastructure for Kube
 	 - Autoscaling validation (HPA).
 	 - Metrics-server for resource metrics.
 
+
 ## Architecture Diagram
 
-```mermaid
-graph TD
-	subgraph AWS
-		VPC[VPC]
-		IGW[Internet Gateway]
-		NAT[NAT Gateway]
-		PUB[Public Subnets]
-		PRIV[Private Subnets]
-		EKS[EKS Cluster]
-		NG[Node Groups]
-		LB[Load Balancer]
-		Prometheus[Prometheus]
-		Grafana[Grafana]
-	end
-
-	VPC --> IGW
-	VPC --> NAT
-	VPC --> PUB
-	VPC --> PRIV
-	PUB --> IGW
-	PRIV --> NAT
-	EKS --> NG
-	NG --> PRIV
-	EKS --> LB
-	LB --> PUB
-	NG --> Prometheus
-	NG --> Grafana
-	Prometheus --> Grafana
-```
+![Architecture Diagram](architecture.png)
 
 ## Workflow
 
@@ -70,11 +43,5 @@ graph TD
 
 - Spot instances for workloads.
 - Autoscaling and right-sized resources.
-
-You can view the full architecture diagram for this project in Excalidraw format:
-
-## Architecture Diagram
-
-![Architecture Diagram](architecture.png)
 
 ---

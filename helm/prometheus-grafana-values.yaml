@@ -1,5 +1,4 @@
 grafana:
-  adminPassword: "${GRAFANA_ADMIN_PASSWORD}"
   service:
     type: LoadBalancer
   dashboards:
