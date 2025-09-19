@@ -209,6 +209,11 @@ jobs:
         with:
           version: "3.19.0"
 
+      - name: Update kubeconfig
+        id: kubeconfig
+        run: |
+          aws eks update-kubeconfig --region ${{ vars.AWS_REGION }} --name tabajarafy-eks
+
       - name: Uninstall TabajaraFy chart
         id: uninstall_tabajarafy
         if: contains(needs.validation.outputs.removed_files, 'helm/tabajarafy-chart')
