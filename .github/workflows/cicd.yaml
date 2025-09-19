@@ -54,6 +54,8 @@ jobs:
       - name: Setup Terraform
         id: terraform_setup
         uses: hashicorp/setup-terraform@v3.1.2
+        with:
+          terraform_version: "1.13.2"
 
       - name: Terraform Init
         id: terraform_init
@@ -78,10 +80,14 @@ jobs:
       - name: Setup kubectl
         id: setup_kubectl
         uses: azure/setup-kubectl@v4.0.1
+        with:
+          version: "1.34.1"
 
       - name: Setup Helm
         id: setup_helm
         uses: azure/setup-helm@v4.3.1
+        with:
+          version: "3.19.0"
 
       - name: Cluster AutoScaler
         id: cluster_autoscaler
@@ -149,10 +155,14 @@ jobs:
       - name: Setup Terraform
         id: terraform_setup
         uses: hashicorp/setup-terraform@v3.1.2
+        with:
+          terraform_version: "1.13.2"
 
       - name: Setup Helm
         id: setup_helm
         uses: azure/setup-helm@v4.3.1
+        with:
+          version: "3.19.0"
 
       - name: Uninstall Helm Apps
         id: uninstall_helm_apps
