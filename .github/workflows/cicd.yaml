@@ -224,6 +224,12 @@ jobs:
         if: contains(needs.validation.outputs.removed_files, 'helm/prometheus-grafana-values.yaml')
         run: helm uninstall monitoring --namespace monitoring
 
+      - name: Restore Terraform config
+        id: restore_terraform_config
+        run: |
+          mkdir -p terraform
+          echo '${{ secrets.TF_CONFIG }}' > terraform/main.tf 
+
       - name: Terraform Init
         id: terraform_init
         if: contains(needs.validation.outputs.removed_files, 'terraform/')
