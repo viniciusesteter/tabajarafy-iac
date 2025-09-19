@@ -1,6 +1,0 @@
-apiVersion: v2
-name: tabajarafy
-description: Helm chart for TabajaraFy application
-type: application
-version: 0.1.0
-appVersion: "1.0"
