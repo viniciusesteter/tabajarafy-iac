@@ -14,6 +14,12 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       removed: ${{ steps.setting_output.outputs.file_removed }}
+      all: ${{ steps.setting_output.outputs.all }}
+      added: ${{ steps.setting_output.outputs.added }}
+      modified: ${{ steps.setting_output.outputs.modified }}
+      removed_files: ${{ steps.setting_output.outputs.removed }}
+      renamed: ${{ steps.setting_output.outputs.renamed }}
+      added_modified: ${{ steps.setting_output.outputs.added_modified }}
     steps:
       - name: Checkout code
         id: checkout
@@ -27,12 +33,18 @@ jobs:
       - name: Set output
         id: setting_output
         run: |
+          echo "all=${{ steps.changed_files.outputs.all }}" >> $GITHUB_OUTPUT
+          echo "added=${{ steps.changed_files.outputs.added }}" >> $GITHUB_OUTPUT
+          echo "modified=${{ steps.changed_files.outputs.modified }}" >> $GITHUB_OUTPUT
+          echo "removed=${{ steps.changed_files.outputs.removed }}" >> $GITHUB_OUTPUT
+          echo "renamed=${{ steps.changed_files.outputs.renamed }}" >> $GITHUB_OUTPUT
+          echo "added_modified=${{ steps.changed_files.outputs.added_modified }}" >> $GITHUB_OUTPUT
+
           if [ -n "${{ steps.changed_files.outputs.removed }}" ]; then
             echo "file_removed=true" >> $GITHUB_OUTPUT
           else
             echo "file_removed=false" >> $GITHUB_OUTPUT
           fi
-
   deploy:
     name: Deploy IaC and Application TabajaraFy
     needs: validation
@@ -59,16 +71,28 @@ jobs:
 
       - name: Terraform Init
         id: terraform_init
+        if: |
+          contains(needs.validation.outputs.added, 'terraform/') ||
+          contains(needs.validation.outputs.modified, 'terraform/') ||
+          contains(needs.validation.outputs.renamed, 'terraform/')
         working-directory: terraform
         run: terraform init
 
       - name: Terraform Plan
         id: terraform_plan
+        if: |
+          contains(needs.validation.outputs.added, 'terraform/') ||
+          contains(needs.validation.outputs.modified, 'terraform/') ||
+          contains(needs.validation.outputs.renamed, 'terraform/')
         working-directory: terraform
         run: terraform plan
 
       - name: Terraform Apply
         id: terraform_apply
+        if: |
+          contains(needs.validation.outputs.added, 'terraform/') ||
+          contains(needs.validation.outputs.modified, 'terraform/') ||
+          contains(needs.validation.outputs.renamed, 'terraform/')
         working-directory: terraform
         run: terraform apply -auto-approve
 
@@ -87,8 +111,24 @@ jobs:
         with:
           version: "3.19.0"
 
+      - name: Check Cluster Autoscaler
+        id: check_autoscaler
+        run: |
+          set -e
+          if helm status cluster-autoscaler -n kube-system >/dev/null 2>&1; then
+            STATUS=$(helm status cluster-autoscaler -n kube-system | grep STATUS | awk '{print $2}')
+            if [ "$STATUS" = "deployed" ]; then
+              echo "autoscaler_healthy=true" >> $GITHUB_OUTPUT
+            else
+              echo "autoscaler_healthy=false" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "autoscaler_healthy=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Cluster AutoScaler
         id: cluster_autoscaler
+        if: steps.check_autoscaler.outputs.autoscaler_healthy != 'true'
         run: |
           helm repo add autoscaler https://kubernetes.github.io/autoscaler
           helm repo update
@@ -96,6 +136,10 @@ jobs:
 
       - name: Deploy Prometheus/Grafana
         id: deploy_prometheus_grafana
+        if: |
+          contains(needs.validation.outputs.added, 'helm/prometheus-grafana-values.yaml') ||
+          contains(needs.validation.outputs.modified, 'helm/prometheus-grafana-values.yaml') ||
+          contains(needs.validation.outputs.renamed, 'helm/prometheus-grafana-values.yaml')
         run: |
           helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
           helm repo update
@@ -108,10 +152,18 @@ jobs:
 
       - name: Deploy TabajaraFy chart
         id: deploy_tabajarafy
+        if: |
+          contains(needs.validation.outputs.added, 'helm/tabajarafy-chart') ||
+          contains(needs.validation.outputs.modified, 'helm/tabajarafy-chart') ||
+          contains(needs.validation.outputs.renamed, 'helm/tabajarafy-chart')
         run: helm upgrade --install tabajarafy helm/tabajarafy-chart --namespace tabajarafy --create-namespace
 
       - name: Rollout TabajaraFy chart
         id: rollout_tabajarafy
+        if: |
+          contains(needs.validation.outputs.added, 'helm/tabajarafy-chart') ||
+          contains(needs.validation.outputs.modified, 'helm/tabajarafy-chart') ||
+          contains(needs.validation.outputs.renamed, 'helm/tabajarafy-chart')
         run: |
           kubectl rollout restart deployment/tabajarafy -n tabajarafy
           kubectl rollout status deployment/tabajarafy -n tabajarafy --timeout=60s
@@ -157,24 +209,35 @@ jobs:
         with:
           version: "3.19.0"
 
-      - name: Uninstall Helm Apps
-        id: uninstall_helm_apps
-        run: |
-          helm uninstall tabajarafy --namespace tabajarafy
-          helm uninstall monitoring --namespace monitoring
-          helm uninstall cluster-autoscaler --namespace kube-system
+      - name: Uninstall TabajaraFy chart
+        id: uninstall_tabajarafy
+        if: contains(needs.validation.outputs.removed_files, 'helm/tabajarafy-chart')
+        run: helm uninstall tabajarafy --namespace tabajarafy
+
+      - name: Uninstall Monitoring
+        id: uninstall_monitoring
+        if: contains(needs.validation.outputs.removed_files, 'helm/prometheus-grafana-values.yaml')
+        run: helm uninstall monitoring --namespace monitoring
+
+      - name: Uninstall Cluster Autoscaler
+        id: uninstall_cluster_autoscaler
+        if: contains(needs.validation.outputs.removed_files, 'helm/cluster-autoscaler')
+        run: helm uninstall cluster-autoscaler --namespace kube-system
 
       - name: Terraform Init
         id: terraform_init
+        if: contains(needs.validation.outputs.removed_files, 'terraform/')
         working-directory: terraform
         run: terraform init
 
       - name: Terraform Plan
         id: terraform_plan
+        if: contains(needs.validation.outputs.removed_files, 'terraform/')
         working-directory: terraform
         run: terraform plan
 
       - name: Terraform Destroy
         id: terraform_destroy
+        if: contains(needs.validation.outputs.removed_files, 'terraform/')
         working-directory: terraform
         run: terraform destroy -auto-approve
