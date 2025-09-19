@@ -224,11 +224,6 @@ jobs:
         if: contains(needs.validation.outputs.removed_files, 'helm/prometheus-grafana-values.yaml')
         run: helm uninstall monitoring --namespace monitoring
 
-      - name: Uninstall Cluster Autoscaler
-        id: uninstall_cluster_autoscaler
-        if: contains(needs.validation.outputs.removed_files, 'helm/cluster-autoscaler')
-        run: helm uninstall cluster-autoscaler --namespace kube-system
-
       - name: Terraform Init
         id: terraform_init
         if: contains(needs.validation.outputs.removed_files, 'terraform/')
