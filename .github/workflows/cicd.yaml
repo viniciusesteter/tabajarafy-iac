@@ -93,11 +93,11 @@ jobs:
           helm repo add autoscaler https://kubernetes.github.io/autoscaler
           helm repo update
           helm upgrade --install cluster-autoscaler autoscaler/cluster-autoscaler \ 
-            --namespace kube-system \
-            --set autoDiscovery.clusterName=tabajarafy-eks \
-            --set awsRegion=${{ secrets.AWS_REGION }} \
-            --set awsAccessKeyID=${{ secrets.AWS_ACCESS_KEY_ID }} \
-            --set awsSecretAccessKey=${{ secrets.AWS_SECRET_ACCESS_KEY }}
+           --namespace kube-system \
+           --set autoDiscovery.clusterName=tabajarafy-eks \
+           --set awsRegion=${{ secrets.AWS_REGION }} \
+           --set awsAccessKeyID=${{ secrets.AWS_ACCESS_KEY_ID }} \
+           --set awsSecretAccessKey=${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
       - name: Deploy Prometheus/Grafana
         id: deploy_prometheus_grafana
