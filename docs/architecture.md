@@ -28,7 +28,7 @@ graph TD
 		PUB[Public Subnets]
 		PRIV[Private Subnets]
 		EKS[EKS Cluster]
-		NG[Node Groups (Spot)]
+		NG[Node Groups]
 		LB[Load Balancer]
 		Prometheus[Prometheus]
 		Grafana[Grafana]
@@ -75,6 +75,6 @@ You can view the full architecture diagram for this project in Excalidraw format
 
 ## Architecture Diagram
 
-- [View architecture](architecture.png)
+![Architecture Diagram](architecture.png)
 
 ---

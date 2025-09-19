@@ -106,7 +106,7 @@ terraform apply --auto-approve
 aws eks update-kubeconfig --region us-east-1 --name tabajarafy-eks
 ```
 
-4. **Deploy Kubernetes components**
+### 4. Deploy Kubernetes components
 
 4.1. **Cluster AutoScaler:**
 ```sh
