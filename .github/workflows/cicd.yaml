@@ -118,17 +118,17 @@ jobs:
           if helm status cluster-autoscaler -n kube-system >/dev/null 2>&1; then
             STATUS=$(helm status cluster-autoscaler -n kube-system | grep STATUS | awk '{print $2}')
             if [ "$STATUS" = "deployed" ]; then
-              echo "autoscaler_healthy=true" >> $GITHUB_ENV
+              echo "AUTOSCALER_HEALTHY=true" >> $GITHUB_ENV
             else
-              echo "autoscaler_healthy=false" >> $GITHUB_ENV
+              echo "AUTOSCALER_HEALTHY=false" >> $GITHUB_ENV
             fi
           else
-            echo "autoscaler_healthy=false" >> $GITHUB_ENV
+            echo "AUTOSCALER_HEALTHY=false" >> $GITHUB_ENV
           fi
 
       - name: Cluster AutoScaler
         id: cluster_autoscaler
-        if: steps.check_autoscaler.env.autoscaler_healthy != 'true'
+        if: env.AUTOSCALER_HEALTHY != 'true'
         run: |
           helm repo add autoscaler https://kubernetes.github.io/autoscaler
           helm repo update
