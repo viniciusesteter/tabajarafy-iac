@@ -233,14 +233,17 @@ jobs:
       - name: Terraform Init
         id: terraform_init
         if: contains(needs.validation.outputs.removed_files, 'terraform/')
+        working-directory: terraform
         run: terraform init
 
       - name: Terraform Plan
         id: terraform_plan
         if: contains(needs.validation.outputs.removed_files, 'terraform/')
+        working-directory: terraform
         run: terraform plan
 
       - name: Terraform Destroy
         id: terraform_destroy
         if: contains(needs.validation.outputs.removed_files, 'terraform/')
+        working-directory: terraform
         run: terraform destroy -auto-approve
