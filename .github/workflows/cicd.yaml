@@ -1,0 +1,188 @@
+name: CI/CD TabajaraFy
+
+on:
+	push:
+		branches:
+			- master
+		paths:
+			- 'terraform/**'
+			- 'helm/**'
+
+jobs:
+	env:
+		CLUSTER_NAME: tabajarafy-eks
+		APP: tabajarafy
+		MONITORING: monitoring
+
+  validation:
+	  name: Validation
+		runs-on: ubuntu-latest
+		outputs:
+			removed: ${{ steps.setting_output.outputs.file_removed }}
+		steps:
+			- name: Checkout code
+			  id: checkout
+				uses: actions/checkout@v5.0.0
+
+			- name: Get changed files
+			  id: changed_files
+				uses: jitterbit/get-changed-files@v1
+				continue-on-error: true
+
+			- name: Set output
+			  id: setting_output
+				run: |
+					if [ -n "${{ steps.changed_files.outputs.removed }}" ]; then
+					  echo "file_removed=true" >> $GITHUB_OUTPUT
+					else
+					  echo "file_removed=false" >> $GITHUB_OUTPUT
+					fi
+
+	deploy:
+	  name: Deploy IaC and Application TabajaraFy
+		needs: validation
+		if: needs.validation.outputs.removed == 'false'
+		runs-on: ubuntu-latest
+		steps:
+			- name: Checkout code
+			  id: checkout
+				uses: actions/checkout@v5.0.0
+
+			- name: Configure AWS credentials
+			  id: aws_credentials
+				uses: aws-actions/configure-aws-credentials@v5.0.0
+				with:
+					aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+					aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+					aws-region: ${{ secrets.AWS_REGION }}
+			
+			- name: Install awscli
+			  id: aws_cli
+				run: |
+					sudo apt-get update
+					sudo apt-get install -y awscli
+
+			- name: Setup Terraform
+			  id: terraform_setup
+				uses: hashicorp/setup-terraform@v3.1.2
+
+			- name: Terraform Init
+			  id: terraform_init
+				working-directory: terraform
+				run: terraform init
+
+			- name: Terraform Plan
+				id: terraform_plan
+				working-directory: terraform
+				run: terraform plan
+
+			- name: Terraform Apply
+			  id: terraform_apply
+				working-directory: terraform
+				run: terraform apply -auto-approve
+
+			- name: Update kubeconfig
+			  id: kubeconfig
+				run: |
+					aws eks update-kubeconfig --region ${{ secrets.AWS_REGION }} --name ${{ env.CLUSTER_NAME }}
+
+			- name: Setup kubectl
+			  id: setup_kubectl
+				uses: azure/setup-kubectl@v4.0.1
+
+			- name: Setup Helm
+			  id: setup_helm
+				uses: azure/setup-helm@v4.3.1
+
+			- name: Cluster AutoScaler
+			  id: cluster_autoscaler
+				run: |
+					helm repo add autoscaler https://kubernetes.github.io/autoscaler
+					helm repo update
+					helm upgrade --install cluster-autoscaler autoscaler/cluster-autoscaler \ 
+						--namespace kube-system \
+						--set autoDiscovery.clusterName=${{ env.CLUSTER_NAME }} \
+						--set awsRegion=${{ secrets.AWS_REGION }} \
+						--set awsAccessKeyID=${{ secrets.AWS_ACCESS_KEY_ID }} \
+						--set awsSecretAccessKey=${{ secrets.AWS_SECRET_ACCESS_KEY }}
+			
+			- name: Deploy Prometheus/Grafana
+			  id: deploy_prometheus_grafana
+				run: |
+					helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+					helm repo update
+					helm upgrade --install ${{ env.MONITORING }} prometheus-community/kube-prometheus-stack --namespace ${{ env.MONITORING }} --create-namespace --values helm/prometheus-grafana-values.yaml --set grafana.adminPassword=${{ secrets.GRAFANA_ADMIN_PASSWORD }}
+
+			- name: Install metrics-server
+			  id: install_metrics_server
+				run: |
+					kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+
+			- name: Deploy TabajaraFy chart
+			  id: deploy_tabajarafy
+				run: helm upgrade --install ${{ env.APP }} helm/tabajarafy-chart --namespace ${{ env.APP }} --create-namespace
+
+			- name: Rollout TabajaraFy chart
+			  id: rollout_tabajarafy
+				run: |
+					kubectl rollout restart deployment/${{ env.APP }} -n ${{ env.APP }}
+					kubectl rollout status deployment/${{ env.APP }} -n ${{ env.APP }} --timeout=60s
+
+			- name: Smoke test
+			  id: smoke_test
+				run: |
+					kubectl get svc -n ${{ env.APP }}
+					kubectl get pods -n ${{ env.APP }}
+
+			- name: Get Application URL
+				run: |
+					APP_URL=$(kubectl get svc -n ${{ env.APP }} ${{ env.APP }} -o jsonpath="{.status.loadBalancer.ingress[0].hostname}")
+					echo "Application URL: http://$APP_URL"
+
+	destroy:
+	  name: Uninstall Application TabajaraFy and Destroy IaC
+		needs: validation
+		if: needs.validation.outputs.removed == 'true'
+		runs-on: ubuntu-latest
+		steps:
+			- name: Checkout code
+			  id: checkout
+				uses: actions/checkout@v5.0.0
+
+			- name: Configure AWS credentials
+			  id: aws_credentials
+				uses: aws-actions/configure-aws-credentials@v5.0.0
+				with:
+					aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+					aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+					aws-region: ${{ secrets.AWS_REGION }}
+
+			- name: Setup Terraform
+			  id: terraform_setup
+				uses: hashicorp/setup-terraform@v3.1.2
+
+			- name: Setup Helm
+			  id: setup_helm
+				uses: azure/setup-helm@v4.3.1
+
+			- name: Uninstall Helm Apps
+				id: uninstall_helm_apps
+				run: |
+					helm uninstall ${{ env.APP }} --namespace ${{ env.APP }}
+					helm uninstall ${{ env.MONITORING }} --namespace ${{ env.MONITORING }}
+					helm uninstall cluster-autoscaler --namespace kube-system
+
+			- name: Terraform Init
+			  id: terraform_init
+				working-directory: terraform
+				run: terraform init
+
+			- name: Terraform Plan
+			  id: terraform_plan
+				working-directory: terraform
+				run: terraform plan
+
+			- name: Terraform Destroy
+			  id: terraform_destroy
+				working-directory: terraform
+				run: terraform destroy -auto-approve
