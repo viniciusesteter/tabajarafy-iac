@@ -3,7 +3,7 @@ from concurrent.futures import ThreadPoolExecutor
 import threading
 import time
 
-APP_URL = "http://add391d26190b459185eefff9cab925c-1303964353.us-east-1.elb.amazonaws.com/" # Change
+APP_URL = "http://a04f9c20d7e014ee4ba04d7106a3f749-642663165.us-east-1.elb.amazonaws.com/" # Change
 NUM_REQUESTS = 100
 NUM_THREADS = 20
 DURATION = 120
